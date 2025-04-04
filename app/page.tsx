@@ -1,103 +1,199 @@
-import Image from "next/image";
+"use client"
 
-export default function Home() {
+import { useEffect, useState } from "react"
+import Navbar from "@/components/navbar"
+import IssueList from "@/components/issue-list"
+import type { GitHubIssue } from "@/types/github"
+import SearchInput from "@/components/search-input"
+import RefreshButton from "@/components/refresh-button"
+import apiService from "@/lib/api-service"
+import { useSession } from "next-auth/react"
+import { GitBranch, Filter, X, Loader2 } from "lucide-react"
+
+type GetDataFunction = (language: string | null, searchString: string | null, page: number | null) => Promise<void>
+
+function App() {
+  const [issues, setIssues] = useState<GitHubIssue[] | null>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState("")
+  const [language, setLanguage] = useState<string | null>(null)
+  const [searchString, setSearchString] = useState<string | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState<number>(1)
+  const [isLoadingFullPage, setIsLoadingFullPage] = useState(true)
+  const {  status } = useSession()
+
+  const getData: GetDataFunction = async (language = null, searchString = null, page = 1) => {
+    setIsLoading(true)
+    try {
+      const newData = await apiService.searchIssues(language, searchString, page)
+
+      if (newData.error) {
+        setError(newData.error)
+      } else {
+        setError("")
+
+        if (page === 1) {
+          setIssues(newData.items || [])
+        } else {
+          setIssues((prevIssues) => [...(prevIssues || []), ...(newData.items || [])])
+        }
+
+        setTotalPages(Math.ceil((newData.total_count || 0) / 30))
+      }
+    } catch (err) {
+      // eslint-disable-next-line @typescript-eslint/no-used-vars
+      setError("Failed to fetch issues. Please try again.")
+    } finally {
+      setIsLoading(false)
+      setIsLoadingFullPage(false)
+    }
+  }
+
+  useEffect(() => {
+    if (status === "authenticated") {
+      getData(null, null, 1)
+    } else if (status === "unauthenticated") {
+      setIsLoadingFullPage(false)
+    }
+  }, [status])
+
+  const onLanguageChange = (language: string) => {
+    setLanguage(language)
+    setCurrentPage(1) 
+    getData(language, searchString, 1)
+  }
+
+  const onSearchInputChange = (searchString: string) => {
+    setSearchString(searchString)
+    setCurrentPage(1) 
+    getData(language, searchString, 1)
+  }
+
+  const onRefreshButtonClick = () => {
+    setCurrentPage(1) 
+    getData(language, searchString, 1)
+  }
+
+  const loadNewData = () => {
+    if (isLoading || currentPage >= totalPages) return
+    const nextPage = currentPage + 1
+    setCurrentPage(nextPage)
+    getData(language, searchString, nextPage)
+  }
+
+  const retry = () => {
+    if (isLoading) return
+    getData(language, searchString, currentPage)
+  }
+
+  const clearFilter = (type: "language" | "search") => {
+    if (type === "language") {
+      setLanguage(null)
+      getData(null, searchString, 1)
+    } else {
+      setSearchString(null)
+      getData(language, null, 1)
+    }
+    setCurrentPage(1)
+  }
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <div className="min-h-screen bg-[#0d1117] text-[#c9d1d9]">
+      <Navbar />
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
+      <main className="container mx-auto px-4 py-6 pt-24">
+        {status === "loading" ? (
+          <div className="flex flex-col items-center justify-center h-64">
+            <Loader2 className="h-8 w-8 animate-spin text-[#58a6ff]" />
+            <p className="mt-4 text-[#8b949e]">Loading...</p>
+          </div>
+        ) : status === "authenticated" ? (
+          <>
+            <div className="mb-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+                <div>
+                  <h1 className="text-2xl font-bold text-[#c9d1d9] flex items-center">
+                    <GitBranch className="h-5 w-5 mr-2 text-[#238636]" />
+                    Good First Issues Explorer
+                  </h1>
+                  <p className="text-[#8b949e] mt-1">Find beginner-friendly issues across GitHub repositories</p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <RefreshButton onClick={onRefreshButtonClick} isLoading={isLoading} />
+                  <span className="text-sm text-[#8b949e]">
+                    {issues?.length ? `Showing ${issues.length} issues` : ""}
+                  </span>
+                </div>
+              </div>
+
+              <SearchInput
+                onLanguageChange={onLanguageChange}
+                onSearchStringChange={onSearchInputChange}
+              />
+
+              {(language || searchString) && (
+                <div className="flex flex-wrap items-center gap-2 mt-4">
+                  <span className="text-sm text-[#8b949e] flex items-center">
+                    <Filter className="h-3.5 w-3.5 mr-1" />
+                    Active filters:
+                  </span>
+
+                  {language && (
+                    <div className="flex items-center bg-[#21262d] text-[#c9d1d9] text-sm rounded-full px-3 py-1">
+                      <span>Language: {language}</span>
+                      <button
+                        onClick={() => clearFilter("language")}
+                        className="ml-2 text-[#8b949e] hover:text-[#c9d1d9]"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  )}
+
+                  {searchString && (
+                    <div className="flex items-center bg-[#21262d] text-[#c9d1d9] text-sm rounded-full px-3 py-1">
+                      <span>Search: {searchString}</span>
+                      <button
+                        onClick={() => clearFilter("search")}
+                        className="ml-2 text-[#8b949e] hover:text-[#c9d1d9]"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <IssueList
+              isLoadingFullPage={isLoadingFullPage}
+              isLoading={isLoading}
+              error={error}
+              issues={issues}
+              totalPages={totalPages}
+              onReachedBottom={loadNewData}
+              currentPage={currentPage}
+              onRetry={retry}
             />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
+          </>
+        ) : (
+          <div className="flex flex-col items-center justify-center h-96 max-w-md mx-auto text-center">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[#161b22] mb-4">
+              <GitBranch className="h-8 w-8 text-[#58a6ff]" />
+            </div>
+            <h2 className="text-xl font-bold text-[#c9d1d9] mb-2">Sign in to explore GitHub issues</h2>
+            <p className="text-[#8b949e] mb-6">
+              Connect with your GitHub account to discover good first issues and start contributing to open source
+              projects.
+            </p>
+          </div>
+        )}
       </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
     </div>
-  );
+  )
 }
+
+export default App
+
