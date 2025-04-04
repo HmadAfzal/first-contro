@@ -76,7 +76,7 @@ export function AuthButton() {
       onClick={() => signIn("github")}
       className="flex items-center gap-2 h-9 px-3 rounded-md bg-[#238636] hover:bg-[#2ea043] text-white text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-[#238636] focus:ring-offset-2 focus:ring-offset-[#0d1117]"
     >
-      <span className="hidden sm:inline">Sign in</span>
+      Sign in
     </button>
   )
 }
