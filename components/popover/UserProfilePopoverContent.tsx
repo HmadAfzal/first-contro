@@ -1,5 +1,5 @@
+import { GitHubIssue } from "@/types/github";
 import React from "react";
-import { GitHubIssue } from "../../types";
 
 export interface UserProfilePopoverContentI {
   issue: GitHubIssue;
