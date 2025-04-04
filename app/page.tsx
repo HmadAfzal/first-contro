@@ -42,7 +42,6 @@ function App() {
         setTotalPages(Math.ceil((newData.total_count || 0) / 30))
       }
     } catch (err) {
-      // eslint-disable-next-line @typescript-eslint/no-used-vars
       setError("Failed to fetch issues. Please try again.")
     } finally {
       setIsLoading(false)
