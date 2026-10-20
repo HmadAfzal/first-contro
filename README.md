@@ -3,7 +3,7 @@
 
 # FirstContro
 
-**FirstContro** is a web app built to help developers — especially **beginners** — make their first open source contribution.  
+**FirstContro** is a web app built to help developers especially **beginners** make their first open source contribution.  
 The app finds **beginner-friendly GitHub issues** labeled with `good first issue` and allows users to filter by programming language.
 
 Contributing to open source can feel overwhelming when you start — this app aims to make that first step easier.
